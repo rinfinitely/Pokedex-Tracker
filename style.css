@@ -67,3 +67,6 @@ dialog::backdrop{background:#000a;backdrop-filter:blur(3px)}
 .foot{max-width:1280px;margin:0 auto;padding:0 14px 30px;color:var(--mut);font-size:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .foot a{color:var(--mut)}
 @media(max-width:520px){h1{font-size:16px}#grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}.t img{width:72px;height:72px}}
+
+.gh{grid-column:1/-1;margin:18px 2px 2px;font-size:15px;font-weight:700;color:var(--mut)}
+.gh:first-child{margin-top:4px}

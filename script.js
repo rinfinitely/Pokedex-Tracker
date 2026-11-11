@@ -52,12 +52,12 @@ function url(id,gi,sh){
   const f=(v===1?SLUGS[id-1]:v)+(g.k==='rb'||g.k==='y'?'-color':'')+'.png';
   return BASE+[...g.d.split('/'),...(g.k==='rb'||g.k==='y'?[]:[sh?'shiny':'normal']),f].map(encodeURIComponent).join('/');
 }
-// Sprite URL chain: the chosen game's sprite first, then the same Pokémon from the nearest other game that has it.
+// Sprite URL chain: the chosen game's sprite first, then the same Pokémon from previous generations' games (newest older game first), then newer games.
 function chain(id,gi=st.gen,sh=st.shiny){
   const want=sh&&G[gi].s,L=[];
   const add=(j,v)=>{const u=has(id,j,v)&&url(id,j,v);if(u&&!L.includes(u))L.push(u)};
   add(gi,want);
-  const near=G.map((_,j)=>j).filter(j=>j!==gi).sort((a,b)=>Math.abs(a-gi)-Math.abs(b-gi)||b-a);
+  const near=G.map((_,j)=>j).filter(j=>j!==gi).sort((a,b)=>(a<gi)-(b<gi)||(a<gi?b-a:a-b));
   near.forEach(j=>add(j,want));
   if(want){add(gi,false);near.forEach(j=>add(j,false))} // no shiny sprite anywhere yet → show the normal one
   return L;
@@ -95,7 +95,8 @@ function list(){
 function render(){
   const g=G[st.gen],a=list();
   $('#grid').className=g.px?'px':'';
-  $('#grid').innerHTML=a.length?a.map(i=>`<article class="t${caught.has(i)?' got':''}${has(i,st.gen,false)?'':' fut'}" data-id="${i}" tabindex="0"><button class="ck" aria-label="Toggle caught" title="Mark as caught">✓</button><img referrerpolicy="no-referrer" loading="lazy" decoding="async" alt="" data-id="${i}" data-k="0" src="${chain(i)[0]}"><b>${pad(i)}</b><span>${nm(i)}</span></article>`).join(''):'<div class="empty">No Pokémon match your filters.</div>';
+  let gh=-1;const tile=i=>`<article class="t${caught.has(i)?' got':''}${has(i,st.gen,false)?'':' fut'}" data-id="${i}" tabindex="0"><button class="ck" aria-label="Toggle caught" title="Mark as caught">✓</button><img crossorigin="anonymous" referrerpolicy="no-referrer" loading="lazy" decoding="async" alt="" data-id="${i}" data-k="0" src="${chain(i)[0]}"><b>${pad(i)}</b><span>${nm(i)}</span></article>`;
+  $('#grid').innerHTML=a.length?a.map(i=>{let h='';if(st.sort==='num'){const n=GR.findIndex(x=>i<=x.r[1]);if(n!==gh){gh=n;h=`<h3 class="gh">Generation ${n+1} Pokémon</h3>`}}return h+tile(i)}).join(''):'<div class="empty">No Pokémon match your filters.</div>';
   head();
 }
 function head(){
@@ -117,6 +118,29 @@ function toggle(id){
   if($('#m').open&&cur===id)cta();
 }
 
+// Red/Blue, Yellow, Gold/Silver and Crystal sprites are saved with an opaque white background.
+// Once loaded, knock out the white that touches the edge (flood fill) so they sit cleanly on any theme.
+const WB=/\/(Red & Blue|Yellow|Gold & Silver|Crystal)\//,CL=new Map();
+function unwhite(im){
+  const src=im.src;
+  if(CL.has(src)){im.dataset.clean=1;im.src=CL.get(src);return}
+  try{
+    const w=im.naturalWidth,h=im.naturalHeight,c=document.createElement('canvas');c.width=w;c.height=h;
+    const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);
+    const d=x.getImageData(0,0,w,h),a=d.data,seen=new Uint8Array(w*h),q=[];
+    const bg=p=>a[p*4+3]>0&&a[p*4]>=250&&a[p*4+1]>=250&&a[p*4+2]>=250;
+    const push=p=>{if(!seen[p]&&bg(p)){seen[p]=1;q.push(p)}};
+    for(let i=0;i<w;i++){push(i);push((h-1)*w+i)}
+    for(let j=0;j<h;j++){push(j*w);push(j*w+w-1)}
+    while(q.length){const p=q.pop(),px=p%w;a[p*4+3]=0;
+      if(px>0)push(p-1);if(px<w-1)push(p+1);if(p>=w)push(p-w);if(p<w*(h-1))push(p+w)}
+    x.putImageData(d,0,0);
+    const u=c.toDataURL();CL.set(src,u);im.dataset.clean=1;im.src=u;
+  }catch{}
+}
+document.addEventListener('load',e=>{const im=e.target;
+  if(im.tagName==='IMG'&&im.dataset.id&&!im.dataset.clean&&WB.test(decodeURIComponent(im.src)))unwhite(im)},true);
+
 // Sprite error → walk down the fallback chain
 document.addEventListener('error',e=>{
   const im=e.target;if(im.tagName!=='IMG'||!im.dataset.id)return;
@@ -128,9 +152,9 @@ document.addEventListener('error',e=>{
 async function fill(id){
   cur=id;const m=$('#m'),g=G[st.gen];
   m.innerHTML=`<div class="mh"><button id="pv" aria-label="Previous">‹</button><button id="cl" aria-label="Close">✕</button><button id="nx" aria-label="Next">›</button></div>
-  <div class="hero ${g.px?'px':''}"><img referrerpolicy="no-referrer" data-id="${id}" data-k="0" src="${chain(id)[0]}" alt="${nm(id)}"><h2>${nm(id)}</h2><small>${pad(id)} · Gen ${GR.findIndex(x=>id<=x.r[1])+1} · ${GR[GR.findIndex(x=>id<=x.r[1])].l}</small><div class="types" id="ty"></div></div>
+  <div class="hero ${g.px?'px':''}"><img crossorigin="anonymous" referrerpolicy="no-referrer" data-id="${id}" data-k="0" src="${chain(id)[0]}" alt="${nm(id)}"><h2>${nm(id)}</h2><small>${pad(id)} · Gen ${GR.findIndex(x=>id<=x.r[1])+1} · ${GR[GR.findIndex(x=>id<=x.r[1])].l}</small><div class="types" id="ty"></div></div>
   <div class="cap" style="text-align:center">Sprites by game</div>
-  <div class="hist">${G.map((x,i)=>has(id,i,false)?`<button data-g="${i}" class="${i===st.gen?'on':''}" title="${x.full}"><span class="${x.px?'px':''}"><img referrerpolicy="no-referrer" data-id="${id}" data-g="${i}" data-k="0" loading="lazy" src="${chain(id,i)[0]}" alt=""></span>${x.l}</button>`:'').join('')}</div>
+  <div class="hist">${G.map((x,i)=>has(id,i,false)?`<button data-g="${i}" class="${i===st.gen?'on':''}" title="${x.full}"><span class="${x.px?'px':''}"><img crossorigin="anonymous" referrerpolicy="no-referrer" data-id="${id}" data-g="${i}" data-k="0" loading="lazy" src="${chain(id,i)[0]}" alt=""></span>${x.l}</button>`:'').join('')}</div>
   <div class="info"><div class="facts" id="fc"></div><div id="sts"></div></div>
   <button class="cta" id="cta"></button>`;
   m.querySelector('.hero').style.setProperty('--x','1');
