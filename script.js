@@ -5,6 +5,10 @@ if(window.caches)caches.keys().then(k=>k.forEach(n=>caches.delete(n))).catch(()=
 // To host the sprites yourself, point BASE at wherever those folders live, e.g. '../' when this app sits inside the repo.
 const BASE='https://raw.githubusercontent.com/rinfinitely/Pokedex-Tracker/main/';
 const TOTAL=1025;
+// Pokémon GO icons come from PokeMiners/pogo_assets (pm<dex>.icon.png / pm<dex>.s.icon.png). They're not in the repo above, so no manifest exists:
+// assume every Dex number has one, and a missing icon just falls through the usual fallback chain to another game's sprite.
+const GOBASE='https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/Addressable%20Assets/';
+SPR.go={n:{},s:{}};for(let i=1;i<=TOTAL;i++){SPR.go.n[i]=1;SPR.go.s[i]=1}
 // k: key in SPR (sprites.js) · d: repo folder · l: button label · px: pixel art (drawn crisp)
 // Games without a shiny folder (Red/Blue, Yellow, Let's Go, Sword/Shield, BDSP, Scarlet/Violet) show normal sprites when Shiny is on.
 const G=[
@@ -28,7 +32,8 @@ const G=[
  {k:'swsh',d:'Sword & Shield',l:'Sw/Sh',full:'Sword / Shield'},
  {k:'bdsp',d:'Brilliant Diamond & Shining Pearl',l:'BD/SP',full:'Brilliant Diamond / Shining Pearl'},
  {k:'la',d:'Legends Arceus',l:'LA',full:'Legends: Arceus'},
- {k:'sv',d:'Scarlet & Violet',l:'S/V',full:'Scarlet / Violet'}
+ {k:'sv',d:'Scarlet & Violet',l:'S/V',full:'Scarlet / Violet'},
+ {k:'go',d:'',l:'GO',full:'Pokémon GO'}
 ];
 G.forEach(g=>{g.s=!!(SPR[g.k]&&SPR[g.k].s)});
 // Which Pokémon each generation introduced (for the "Show" filter)
@@ -41,6 +46,7 @@ const SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const pad=n=>'#'+String(n).padStart(4,'0');
 
 let st={gen:Math.max(0,G.findIndex(g=>g.k===LS('nd.g2','sv'))),shiny:LS('nd.shiny',false),reg:0,q:'',stat:'all',sort:'num'};
+st.reg=st.gen+1;
 let caught=new Set(LS('nd.caught',[]));
 let names=LS('nd.names',[]);
 let cur=0;const cache=new Map();
@@ -49,6 +55,7 @@ let cur=0;const cache=new Map();
 const has=(id,gi,sh)=>{const m=SPR[G[gi].k];return !!(m&&m[sh?'s':'n']&&m[sh?'s':'n'][id])};
 function url(id,gi,sh){
   const g=G[gi],m=SPR[g.k]&&SPR[g.k][sh?'s':'n'],v=m&&m[id];if(!v)return null;
+  if(g.k==='go')return GOBASE+'pm'+id+(sh?'.s':'')+'.icon.png';
   const f=(v===1?SLUGS[id-1]:v)+(g.k==='rb'||g.k==='y'?'-color':'')+'.png';
   return BASE+[...g.d.split('/'),...(g.k==='rb'||g.k==='y'?[]:[sh?'shiny':'normal']),f].map(encodeURIComponent).join('/');
 }
@@ -101,16 +108,15 @@ function render(){
 }
 function head(){
   const g=G[st.gen];
-  $('#cap').textContent=(st.reg?'':'All Pokémon · sprites from ')+`${g.l} · ${g.full}`+(st.shiny&&!g.s?' · No shiny sprites for this game, showing normal sprites':'');
-  document.querySelectorAll('#regs button').forEach((b,i)=>b.classList.toggle('on',i===st.reg));
+  $('#cap').textContent=`${g.l} · ${g.full}`+(st.shiny&&!g.s?' · No shiny sprites for this game, showing normal sprites':'');
+  document.querySelectorAll('#regs button').forEach((b,i)=>b.classList.toggle('on',i===st.reg-1));
   $('#shiny').classList.toggle('on',st.shiny);$('#shiny').setAttribute('aria-pressed',st.shiny);
   const n=caught.size,p=Math.round(n/TOTAL*100);
   $('#pt').textContent=`${n} / ${TOTAL} caught`;$('#pp').textContent=p+'%';$('#pb').style.width=(n/TOTAL*100)+'%';
   const em=document.querySelectorAll('#regs em');
-  em[0].textContent=`${n}/${TOTAL}`;
-  G.forEach((_,gi)=>{let c=0,t=0;for(let id=1;id<=TOTAL;id++)if(has(id,gi,false)){t++;if(caught.has(id))c++}em[gi+1].textContent=`${c}/${t}`});
+  G.forEach((_,gi)=>{let c=0,t=0;for(let id=1;id<=TOTAL;id++)if(has(id,gi,false)){t++;if(caught.has(id))c++}em[gi].textContent=`${c}/${t}`});
 }
-function setGen(i){st.gen=i;SV('nd.g2',G[i].k);if(st.reg)st.reg=i+1;render();if($('#m').open)fill(cur)}
+function setGen(i){st.gen=i;SV('nd.g2',G[i].k);st.reg=i+1;render();if($('#m').open)fill(cur)}
 function toggle(id){
   caught.has(id)?caught.delete(id):caught.add(id);
   SV('nd.caught',[...caught]);
@@ -174,8 +180,8 @@ function cta(){const b=$('#cta'),c=caught.has(cur);b.textContent=c?'✓ Caught �
 const go=d=>{const n=cur+d;if(n>=1&&n<=TOTAL)fill(n)};
 
 // Wiring
-$('#regs').innerHTML=[{l:'All',full:'All Pokémon'},...G].map((x,i)=>`<button data-r="${i}" title="${x.full}">${x.l}<em></em></button>`).join('');
-$('#regs').onclick=e=>{const b=e.target.closest('button');if(b){st.reg=+b.dataset.r;if(st.reg){st.gen=st.reg-1;SV('nd.g2',G[st.gen].k)}render();if($('#m').open)fill(cur)}};
+$('#regs').innerHTML=G.map((x,i)=>`<button data-r="${i+1}" title="${x.full}">${x.l}<em></em></button>`).join('');
+$('#regs').onclick=e=>{const b=e.target.closest('button');if(b){st.reg=+b.dataset.r;st.gen=st.reg-1;SV('nd.g2',G[st.gen].k);render();if($('#m').open)fill(cur)}};
 $('#grid').onclick=e=>{const t=e.target.closest('.t');if(!t)return;const id=+t.dataset.id;e.target.closest('.ck')?toggle(id):fill(id)};
 $('#grid').onkeydown=e=>{if(e.key==='Enter'&&e.target.classList.contains('t'))fill(+e.target.dataset.id)};
 let tm;$('#q').oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>{st.q=e.target.value;render()},120)};
