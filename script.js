@@ -40,7 +40,7 @@ const LS=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v==null?
 const SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
 const pad=n=>'#'+String(n).padStart(4,'0');
 
-let st={gen:Math.max(0,G.findIndex(g=>g.k===LS('nd.g2','sv'))),shiny:LS('nd.shiny',false),hide:LS('nd.hide',false),reg:0,q:'',stat:'all',sort:'num'};
+let st={gen:Math.max(0,G.findIndex(g=>g.k===LS('nd.g2','sv'))),shiny:LS('nd.shiny',false),reg:0,q:'',stat:'all',sort:'num'};
 let caught=new Set(LS('nd.caught',[]));
 let names=LS('nd.names',[]);
 let cur=0;const cache=new Map();
@@ -81,36 +81,36 @@ async function loadNames(){
 }
 
 function list(){
-  const r=st.reg?GR[st.reg-1].r:[1,TOTAL];
+  const r=[1,TOTAL];
   let a=[];
   for(let i=r[0];i<=r[1];i++)a.push(i);
   const q=st.q.trim().toLowerCase();
   if(q){const n=/^#?\d+$/.test(q)?+q.replace('#',''):0;a=a.filter(i=>n?i===n:nm(i).toLowerCase().includes(q))}
+  if(st.reg)a=a.filter(i=>has(i,st.reg-1,false)); // a game tab lists that game's Pokédex
   if(st.stat==='got')a=a.filter(i=>caught.has(i));
   if(st.stat==='miss')a=a.filter(i=>!caught.has(i));
-  if(st.hide)a=a.filter(i=>has(i,st.gen,false));
   if(st.sort==='name')a.sort((x,y)=>nm(x).localeCompare(nm(y)));
   return a;
 }
 function render(){
   const g=G[st.gen],a=list();
   $('#grid').className=g.px?'px':'';
-  let gh=-1;const tile=i=>`<article class="t${caught.has(i)?' got':''}${has(i,st.gen,false)?'':' fut'}" data-id="${i}" tabindex="0"><button class="ck" aria-label="Toggle caught" title="Mark as caught">✓</button><img crossorigin="anonymous" referrerpolicy="no-referrer" loading="lazy" decoding="async" alt="" data-id="${i}" data-k="0" src="${chain(i)[0]}"><b>${pad(i)}</b><span>${nm(i)}</span></article>`;
+  let gh=-1;const tile=i=>`<article class="t${caught.has(i)?' got':''}" data-id="${i}" tabindex="0"><button class="ck" aria-label="Toggle caught" title="Mark as caught">✓</button><img crossorigin="anonymous" referrerpolicy="no-referrer" loading="lazy" decoding="async" alt="" data-id="${i}" data-k="0" src="${chain(i)[0]}"><b>${pad(i)}</b><span>${nm(i)}</span></article>`;
   $('#grid').innerHTML=a.length?a.map(i=>{let h='';if(st.sort==='num'){const n=GR.findIndex(x=>i<=x.r[1]);if(n!==gh){gh=n;h=`<h3 class="gh">Generation ${n+1} Pokémon</h3>`}}return h+tile(i)}).join(''):'<div class="empty">No Pokémon match your filters.</div>';
   head();
 }
 function head(){
   const g=G[st.gen];
-  $('#cap').textContent=`${g.l} · ${g.full}`+(st.shiny&&!g.s?' · No shiny sprites for this game, showing normal sprites':'');
-  document.querySelectorAll('#gens button').forEach((b,i)=>{b.classList.toggle('on',i===st.gen);b.setAttribute('aria-checked',i===st.gen)});
+  $('#cap').textContent=(st.reg?'':'All Pokémon · sprites from ')+`${g.l} · ${g.full}`+(st.shiny&&!g.s?' · No shiny sprites for this game, showing normal sprites':'');
   document.querySelectorAll('#regs button').forEach((b,i)=>b.classList.toggle('on',i===st.reg));
   $('#shiny').classList.toggle('on',st.shiny);$('#shiny').setAttribute('aria-pressed',st.shiny);
-  $('#fut').classList.toggle('on',st.hide);$('#fut').setAttribute('aria-pressed',st.hide);
   const n=caught.size,p=Math.round(n/TOTAL*100);
   $('#pt').textContent=`${n} / ${TOTAL} caught`;$('#pp').textContent=p+'%';$('#pb').style.width=(n/TOTAL*100)+'%';
-  [[1,TOTAL],...GR.map(x=>x.r)].forEach((r,i)=>{let c=0;caught.forEach(id=>{if(id>=r[0]&&id<=r[1])c++});document.querySelectorAll('#regs em')[i].textContent=`${c}/${r[1]-r[0]+1}`});
+  const em=document.querySelectorAll('#regs em');
+  em[0].textContent=`${n}/${TOTAL}`;
+  G.forEach((_,gi)=>{let c=0,t=0;for(let id=1;id<=TOTAL;id++)if(has(id,gi,false)){t++;if(caught.has(id))c++}em[gi+1].textContent=`${c}/${t}`});
 }
-function setGen(i){st.gen=i;SV('nd.g2',G[i].k);render();if($('#m').open)fill(cur)}
+function setGen(i){st.gen=i;SV('nd.g2',G[i].k);if(st.reg)st.reg=i+1;render();if($('#m').open)fill(cur)}
 function toggle(id){
   caught.has(id)?caught.delete(id):caught.add(id);
   SV('nd.caught',[...caught]);
@@ -174,17 +174,14 @@ function cta(){const b=$('#cta'),c=caught.has(cur);b.textContent=c?'✓ Caught �
 const go=d=>{const n=cur+d;if(n>=1&&n<=TOTAL)fill(n)};
 
 // Wiring
-$('#gens').innerHTML=G.map((x,i)=>`<button role="radio" data-g="${i}" title="${x.full}">${x.l}</button>`).join('');
-$('#regs').innerHTML=['All',...GR.map(x=>x.l)].map((n,i)=>`<button data-r="${i}">${n}<em></em></button>`).join('');
-$('#gens').onclick=e=>{const b=e.target.closest('button');if(b)setGen(+b.dataset.g)};
-$('#regs').onclick=e=>{const b=e.target.closest('button');if(b){st.reg=+b.dataset.r;render()}};
+$('#regs').innerHTML=[{l:'All',full:'All Pokémon'},...G].map((x,i)=>`<button data-r="${i}" title="${x.full}">${x.l}<em></em></button>`).join('');
+$('#regs').onclick=e=>{const b=e.target.closest('button');if(b){st.reg=+b.dataset.r;if(st.reg){st.gen=st.reg-1;SV('nd.g2',G[st.gen].k)}render();if($('#m').open)fill(cur)}};
 $('#grid').onclick=e=>{const t=e.target.closest('.t');if(!t)return;const id=+t.dataset.id;e.target.closest('.ck')?toggle(id):fill(id)};
 $('#grid').onkeydown=e=>{if(e.key==='Enter'&&e.target.classList.contains('t'))fill(+e.target.dataset.id)};
 let tm;$('#q').oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>{st.q=e.target.value;render()},120)};
 $('#stat').onchange=e=>{st.stat=e.target.value;render()};
 $('#sort').onchange=e=>{st.sort=e.target.value;render()};
 $('#shiny').onclick=()=>{st.shiny=!st.shiny;SV('nd.shiny',st.shiny);render();if($('#m').open)fill(cur)};
-$('#fut').onclick=()=>{st.hide=!st.hide;SV('nd.hide',st.hide);render()};
 $('#m').onclick=e=>{
   if(e.target===$('#m')||e.target.closest('#cl'))return $('#m').close();
   if(e.target.closest('#pv'))return go(-1);
