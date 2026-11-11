@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>National Dex</title>
+<meta name="description" content="A National Pokédex tracker with sprites from every game, Kanto to Paldea.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><div class="w">
+  <div class="top">
+    <h1>National <i>Dex</i></h1>
+    <div class="prog"><small><span id="pt">0 / 1025</span><span id="pp">0%</span></small><div class="bar"><div id="pb"></div></div></div>
+    <div class="sp"></div>
+    <input id="q" type="search" placeholder="Search name or # ( / )" aria-label="Search">
+    <select id="stat" aria-label="Status"><option value="all">All</option><option value="got">Caught</option><option value="miss">Missing</option></select>
+    <select id="sort" aria-label="Sort"><option value="num">Dex order</option><option value="name">A–Z</option></select>
+  </div>
+  <div class="row"><span class="lbl">Sprites</span><div class="seg" id="gens" role="radiogroup" aria-label="Sprite game"></div></div>
+  <div class="cap" id="cap"></div>
+  <div class="row"><span class="lbl">Show</span><div class="seg" id="regs"></div></div>
+  <div class="row">
+    <button class="btn" id="shiny" aria-pressed="false">✨ Shiny sprites</button>
+    <button class="btn" id="fut" aria-pressed="false">Hide Pokémon not in this game</button>
+  </div>
+</div></header>
+<main><div id="grid"></div></main>
+<div class="foot">
+  <button class="btn" id="exp">Export progress</button>
+  <button class="btn" id="imp">Import</button>
+  <button class="btn" id="rst">Reset</button>
+  <input type="file" id="file" accept="application/json" hidden>
+  <span>Progress is saved in this browser. Sprites © Nintendo / Game Freak, from the <a href="https://github.com/rinfinitely/Pokedex-Tracker" target="_blank" rel="noopener">Pokedex-Tracker sprite folders</a>.</span>
+</div>
+<dialog id="m"></dialog>
+<script src="sprites.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
